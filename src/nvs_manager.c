@@ -53,6 +53,17 @@ void store_values(char *nvs_namespace, char *handle, ValueType _type, const void
             }
             break;
         }
+        case TYPE_STR: {
+            const char *val = (const char *)val_ptr;
+            nvs_err = nvs_set_str(nvs_handle, handle, val); 
+            if (nvs_err == ESP_OK) {
+                nvs_commit(nvs_handle);  // save to flash
+                ESP_LOGI(NVS_WRITER, "Stored value of %s = %s in namespace = %s ", handle, val, nvs_namespace);
+            } else {
+                ESP_LOGE(NVS_WRITER, "Failed to store value");
+            }
+            break;
+        }
         default:
             ESP_LOGW(NVS_WRITER, "Unhandled type");
         break;
@@ -80,9 +91,10 @@ esp_err_t read_nvs_value(const char* namespaces[NS_COUNT],
         if (strcmp(ns_to_read, ns) != 0) {
             continue;
         }
-
-        ESP_LOGI(NVS_READER_TAG, "Namespace matched: %s", ns);
+        // DEBUG
+        // ESP_LOGI(NVS_READER_TAG, "Namespace matched: %s", ns);
         nvs_handle_t handle;
+        size_t required_size = 0;
         esp_err_t err = nvs_open(ns, NVS_READONLY, &handle);
         if (err != ESP_OK) {
             ESP_LOGE(NVS_READER_TAG, "Failed to open namespace '%s'", ns);
@@ -97,7 +109,8 @@ esp_err_t read_nvs_value(const char* namespaces[NS_COUNT],
             }
 
             if (strcmp(key_to_read, key) != 0) {
-                ESP_LOGE(NVS_READER_TAG, "Key Unmatched!");
+                // DEBUG
+                // ESP_LOGE(NVS_READER_TAG, "Key Unmatched!");
                 continue;
             }
 
@@ -120,15 +133,39 @@ esp_err_t read_nvs_value(const char* namespaces[NS_COUNT],
                 case TYPE_I32:
                     err = nvs_get_i32(handle, key, (int32_t *)out_val);
                     break;
+                case TYPE_STR:{
+                    err = nvs_get_str(handle, key, NULL, &required_size);
+                    if (err != ESP_OK) {
+                        ESP_LOGE(NVS_READER_TAG,"Error getting size for key %s: %s\n", key, esp_err_to_name(err));
+                        return err;
+                    }
+                    char *buf = malloc(required_size);
+                    if (buf == NULL) {
+                        ESP_LOGE(NVS_READER_TAG,"Memory allocation failed!\n");
+                        return ESP_ERR_NO_MEM;
+                    }
+
+                    err = nvs_get_str(handle, key, buf, &required_size);
+                    if (err == ESP_OK) {
+                        *(char **)out_val = buf;
+                        // DEBUG
+                        // ESP_LOGI(NVS_READER_TAG,"Value of '%s' = %s\n", key, *(char **)out_val);
+                    } else {
+                        ESP_LOGE(NVS_READER_TAG,"Error reading value for key %s: %s\n", key, esp_err_to_name(err));
+                    }
+                    break;
+                }
                 default:
                     ESP_LOGW(NVS_READER_TAG, "Unhandled value type");
                     err = ESP_ERR_INVALID_ARG;
                     break;
             }
-            ESP_LOGE(NVS_READER_TAG, "DEBUG , err = %X", err);
+            // DEBUG
+            // ESP_LOGE(NVS_READER_TAG, "DEBUG , err = %X", err);
             
             if (err == ESP_OK) {
-                ESP_LOGI(NVS_READER_TAG, " Key %s :  ", key);
+                // DEBUG
+                // ESP_LOGI(NVS_READER_TAG, " Key %s :  ", key);
             } else if (err == ESP_ERR_NVS_NOT_FOUND) {
                 ESP_LOGW(NVS_READER_TAG, "Key '%s' not set", key);
             } else {

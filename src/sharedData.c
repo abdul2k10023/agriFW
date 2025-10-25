@@ -18,12 +18,13 @@ static const char* SHARED_DATA_TAG = "SHARED_DATA";
 
 const char* namespaces[NS_COUNT] = {
     "schedule",
-    "constraints"
+    "constraints",
+    "wifi"
     };
     
-const char* all_keys[NS_COUNT][MAX_KEYS_PER_NS] = {{"timeperiod", "duration", "command"},{"humidity",NULL,NULL}};
+const char* all_keys[NS_COUNT][MAX_KEYS_PER_NS] = {{"timeperiod", "duration", "command"},{"humidity",NULL,NULL},{"ssid","wpsk",NULL}};
 
-const int key_counts[NS_COUNT] = {3};
+const int key_counts[NS_COUNT] = {3,1,2};
 
 
 char * get_esp_client_id(void){

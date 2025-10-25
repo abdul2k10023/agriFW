@@ -38,6 +38,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     
     
     switch (event->event_id) {
+
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT Connected");
             mqtt_connected = true;
@@ -56,6 +57,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             }
 
             break;
+
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT Disconnected");
             if (mqtt_blink_task_handle == NULL) {
@@ -65,6 +67,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             }
             mqtt_connected = false;
             break;
+
         case MQTT_EVENT_DATA:{
             // ESP_LOGI(TAG, "Received message on topic %s: %d: %.*s", event->topic, event->data_len, event->data);
                 // Copy topic and data into null-terminated strings
@@ -75,24 +78,32 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             topic[event->topic_len] = '\0';
             memcpy(data, event->data, event->data_len);
             data[event->data_len] = '\0';
-            ESP_LOGI(TAG, "DEBUG: incoming topic='%s' expected='%s'", topic, MQTT_TOPIC_MOTOR_HUMIDITY);
 
+            char parsed_topic[100];
+            char *p = strchr(topic, '/');
+            if(p){
+                strcpy(parsed_topic, p+1);
+                ESP_LOGI(TAG, "Parsed Topic = %s", parsed_topic);
+            } else {
+                ESP_LOGI(TAG, "Topic can`t be parsed!");
+            }
 
-            if (strcmp(topic, MQTT_TOPIC_MOTOR_SCHEDULE) == 0) {
+            if (strcmp(parsed_topic, MQTT_TOPIC_MOTOR_SCHEDULE) == 0) {
                 // Parse JSON for schedule (esp32/motor/schedule)
                 parseScheduleJson(data);
-            } else if (strcmp(topic, MQTT_TOPIC_MOTOR_CMD) == 0) {
+            } else if (strcmp(parsed_topic, MQTT_TOPIC_MOTOR_CMD) == 0) {
                 // Parse JSON for command (esp32/motor/command)
                 parseCommandJson(data);
-            } else if (strcmp(topic, MQTT_TOPIC_OTA_CMD) == 0) {
+            } else if (strcmp(parsed_topic, MQTT_TOPIC_OTA_CMD) == 0) {
                 // Parse JSON for command (esp32/motor/command)
                 parseOTACommandJson(data);
-            } else if (strcmp(topic, MQTT_TOPIC_MOTOR_HUMIDITY) == 0) {
+            } else if (strcmp(parsed_topic, MQTT_TOPIC_MOTOR_HUMIDITY) == 0) {
                 // Parse JSON for command (esp32/motor/command)
-                ESP_LOGI(TAG, "DEBUF: PARSE Humidity");
-
                 parseHumSetPointJson(data);
-            }
+            }  else if (strcmp(topic, MQTT_TOPIC_WIFI_CRED) == 0) {
+                // Parse JSON for command (esp32/motor/command)
+                store_wifi_cred(data);
+            } else
 
             break;
             }
@@ -287,6 +298,39 @@ void parseHumSetPointJson(const char *jsonBuffer) {
     // Clean up the cJSON object
     cJSON_Delete(json);
 }
+
+void store_wifi_cred(const char *jsonBuffer) {
+    // Parse the JSON string into a cJSON object
+    cJSON *json = cJSON_Parse(jsonBuffer);
+    if (json == NULL) {
+        ESP_LOGE(MQTT_PARSE, "Error parsing JSON: %s", jsonBuffer);
+        return;
+    }
+
+    // Extract the "cmd" item from the JSON object
+    cJSON *ssid = cJSON_GetObjectItemCaseSensitive(json, "ssid");
+    cJSON *wpsk = cJSON_GetObjectItemCaseSensitive(json, "wpsk");
+
+    if (cJSON_IsString(ssid)) {
+        ESP_LOGI(MQTT_PARSE, "Received ssid: %s", ssid->valuestring);
+        store_values("wifi","ssid", TYPE_STR,ssid->valuestring);
+
+    } else {
+        ESP_LOGE(MQTT_PARSE, "Invalid command in JSON, 'ssid' is not a string or is NULL.");
+        cJSON_Delete(json);
+        return;
+    }
+    if (cJSON_IsString(wpsk)) {
+        ESP_LOGI(MQTT_PARSE, "Received wpsk: %s", wpsk->valuestring);
+        store_values("wifi","wpsk", TYPE_STR,wpsk->valuestring);
+    } else {
+        ESP_LOGE(MQTT_PARSE, "Invalid command in JSON, 'wpsk' is not a string or is NULL.");
+        cJSON_Delete(json);
+        return;
+    }
+    cJSON_Delete(json);
+}
+
 void parseOTACommandJson(const char *jsonBuffer) {
     // Parse the JSON string into a cJSON object
     cJSON *json = cJSON_Parse(jsonBuffer);

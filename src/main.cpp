@@ -22,6 +22,8 @@
 #include "cJSON.h"
 #include "lwip/netdb.h"
 #include "nvs_manager.h"
+#include "secrets.h"
+
 
 #define I2C_MASTER_SCL_IO    22
 #define I2C_MASTER_SDA_IO    21
@@ -98,6 +100,10 @@ const std::vector<const char*> subscribe_topics = {
 };
 std::vector<const char*> sub_topic_ptrs;
 std::vector<std::string> sub_topics_str;
+
+// wifi Ptrs
+char *ssid = NULL;
+char *wpsk = NULL;
 
 
 extern "C"
@@ -177,29 +183,71 @@ void app_main() {
     shared_sub_data_mutex = xSemaphoreCreateMutex();
     ota_shared_mutex = xSemaphoreCreateMutex();
 
-    if (xSemaphoreTake(shared_sub_data_mutex, pdMS_TO_TICKS(SHARED_SUB_DATA_MUTEX_DELAY) == pdTRUE)) {
+    ESP_LOGI(MAIN_TAG, "==================== NVS READ START ====================");
 
-        if(read_nvs_value(namespaces, all_keys, key_counts, NS_COUNT,"schedule","duration", TYPE_U32, &shared_sub_data.motor_duration) != ESP_OK)
-            ESP_LOGE(MAIN_TAG, "Failed to read duration from NVS!");
-        else{
-            ESP_LOGI(MAIN_TAG, "duration = %lu",shared_sub_data.motor_duration);
+    if (xSemaphoreTake(shared_sub_data_mutex, pdMS_TO_TICKS(SHARED_SUB_DATA_MUTEX_DELAY)) == pdTRUE) {
+        esp_err_t temp_err;
+
+        /* ──────────────── Schedule Namespace ──────────────── */
+        ESP_LOGI(MAIN_TAG, "Namespace: 'schedule'");
+
+        temp_err = read_nvs_value(namespaces, all_keys, key_counts, NS_COUNT,
+                                "schedule", "duration", TYPE_U32, &shared_sub_data.motor_duration);
+        if (temp_err == ESP_OK)
+            ESP_LOGI(MAIN_TAG, "   duration     : %lu", shared_sub_data.motor_duration);
+        else
+            ESP_LOGE(MAIN_TAG, "   duration     : failed (%s)", esp_err_to_name(temp_err));
+
+        temp_err = read_nvs_value(namespaces, all_keys, key_counts, NS_COUNT,
+                                "schedule", "timeperiod", TYPE_U32, &shared_sub_data.motor_timePeriod);
+        if (temp_err == ESP_OK)
+            ESP_LOGI(MAIN_TAG, "   timeperiod   : %lu", shared_sub_data.motor_timePeriod);
+        else
+            ESP_LOGE(MAIN_TAG, "   timeperiod   : failed (%s)", esp_err_to_name(temp_err));
+
+        temp_err = read_nvs_value(namespaces, all_keys, key_counts, NS_COUNT,
+                                "schedule", "command", TYPE_I8, &shared_sub_data.motor_command);
+        if (temp_err == ESP_OK)
+            ESP_LOGI(MAIN_TAG, "   command      : %d", shared_sub_data.motor_command);
+        else
+            ESP_LOGE(MAIN_TAG, "   command      : failed (%s)", esp_err_to_name(temp_err));
+
+        /* ──────────────── Constraints Namespace ──────────────── */
+        ESP_LOGI(MAIN_TAG, "Namespace: 'constraints'");
+
+        temp_err = read_nvs_value(namespaces, all_keys, key_counts, NS_COUNT,
+                                "constraints", "humidity", TYPE_I8, &shared_sub_data.humidity_constraint);
+        if (temp_err == ESP_OK)
+            ESP_LOGI(MAIN_TAG, "   humidity     : %d", shared_sub_data.humidity_constraint);
+        else
+            ESP_LOGE(MAIN_TAG, "   humidity     : failed (%s)", esp_err_to_name(temp_err));
+
+        /* ──────────────── WiFi Namespace ──────────────── */
+        ESP_LOGI(MAIN_TAG, "Namespace: 'wifi'");
+
+        temp_err = read_nvs_value(namespaces, all_keys, key_counts, NS_COUNT,
+                                "wifi", "ssid", TYPE_STR, &ssid);
+        if (temp_err == ESP_OK) {
+            ESP_LOGI(MAIN_TAG, "   ssid         : %s", ssid);
+        } else {
+            ESP_LOGE(MAIN_TAG, "   ssid         : failed (%s)", esp_err_to_name(temp_err));
         }
-        if(read_nvs_value(namespaces, all_keys, key_counts, NS_COUNT,"schedule","timeperiod", TYPE_U32, &shared_sub_data.motor_timePeriod) != ESP_OK)
-            ESP_LOGE(MAIN_TAG, "Failed to read timeperiod from NVS!");
-        else
-            ESP_LOGI(MAIN_TAG, "Timeperiod = %lu",shared_sub_data.motor_timePeriod);
-        if(read_nvs_value(namespaces, all_keys, key_counts, NS_COUNT,"schedule","command", TYPE_I8, &shared_sub_data.motor_command) != ESP_OK)
-            ESP_LOGE(MAIN_TAG, "Failed to read command from NVS!");
-        else
-            ESP_LOGI(MAIN_TAG, "Motor Command = %d",shared_sub_data.motor_command);
-        esp_err_t temp_err = read_nvs_value(namespaces, all_keys, key_counts, NS_COUNT,"constraints","humidity", TYPE_I8, &shared_sub_data.humidity_constraint);
-        if( temp_err != ESP_OK)
-            ESP_LOGE(MAIN_TAG, "Failed to read Humidity from NVS!, Err = %X", temp_err);
-        else
-            ESP_LOGI(MAIN_TAG, "Motor Command = %d",shared_sub_data.humidity_constraint);
-        xSemaphoreGive(shared_sub_data_mutex); 
+
+        
+        temp_err = read_nvs_value(namespaces, all_keys, key_counts, NS_COUNT,
+                                "wifi", "wpsk", TYPE_STR, &wpsk);
+        if (temp_err == ESP_OK) {
+            ESP_LOGI(MAIN_TAG, "   wpsk         : %s", wpsk);
+        } else {
+            ESP_LOGE(MAIN_TAG, "   wpsk         : failed (%s)", esp_err_to_name(temp_err));
+        }
+
+        xSemaphoreGive(shared_sub_data_mutex);
+
+        ESP_LOGI(MAIN_TAG, "==================== NVS READ DONE =====================\n");
+
     } else {
-        ESP_LOGE(MAIN_TAG, "Failed to read values from NVS!");
+        ESP_LOGE(MAIN_TAG, "Failed to take shared_sub_data_mutex → cannot read NVS values!");
     }
 
     // append espIDs to the topics
@@ -207,19 +255,28 @@ void app_main() {
     ESP_LOGI(MAIN_TAG, "My Chip ID: %s\n", ESP_ID_CLIENT);
     sub_topics_str = id_appended_topics(subscribe_topics, ESP_ID_CLIENT);
 
+    // pushing back id less appended subscription topics
+    sub_topics_str.push_back(MQTT_TOPIC_WIFI_CRED);
+
 
     for (auto& t : sub_topics_str){
-        sub_topic_ptrs.push_back(t.c_str());  // safe, because sub_topics_str stays alive
+        sub_topic_ptrs.push_back(t.c_str());
     }
 
-    for(auto t: sub_topic_ptrs){
-        ESP_LOGI(MAIN_TAG, "Sub Topic: %s\n",t);
-    }
-
+    // for(auto t: sub_topic_ptrs){
+    //     ESP_LOGI(MAIN_TAG, "Sub Topic: %s\n",t);
+    // }
 
     // Initialize Wi-Fi
-    wifi_init_sta();
-
+    // if(ssid != NULL || wpsk != NULL){
+    //     ESP_LOGI(MAIN_TAG,"Using Stored Wifi Credentials");
+    //     wifi_init_sta(ssid, wpsk);
+    //     free(ssid);
+    //     free(wpsk);
+    // } else {
+        ESP_LOGI(MAIN_TAG,"Using Backup Wifi Credentials");
+        wifi_init_sta(WIFI_SSID, WIFI_PASS);
+    // }
     // Init MQTT Client
     mqtt_init(sub_topic_ptrs.data(), sub_topic_ptrs.size());
 
@@ -543,6 +600,7 @@ void drive_motor_task(void *arg) {
                 gpio_set_level(MOTOR_PIN, 1);
 
                 cJSON *ack = cJSON_CreateObject();
+                cJSON_AddItemToObject(ack, "espClientID", cJSON_CreateString(get_esp_client_id()));
                 cJSON_AddStringToObject(ack, "status", "True");
                 const char *ack_str = cJSON_Print(ack);
                 mqtt_publish(MQTT_TOPIC_PUB_ACK, ack_str);
@@ -560,6 +618,7 @@ void drive_motor_task(void *arg) {
                 }
 
                 ack = cJSON_CreateObject();
+                cJSON_AddItemToObject(ack, "espClientID", cJSON_CreateString(get_esp_client_id()));
                 cJSON_AddStringToObject(ack, "status", "False");
                 ack_str = cJSON_Print(ack);
                 mqtt_publish(MQTT_TOPIC_PUB_ACK, ack_str);
@@ -640,6 +699,7 @@ void motor_worker_task(void *arg) {
 
             ESP_LOGI(MOTOR_TAG, "Scheduled Motor start!");
             cJSON *ack = cJSON_CreateObject();
+            cJSON_AddItemToObject(ack, "espClientID", cJSON_CreateString(get_esp_client_id()));
             cJSON_AddStringToObject(ack, "status", "True");
             const char *ack_str = cJSON_Print(ack);
             mqtt_publish(MQTT_TOPIC_PUB_ACK, ack_str);
@@ -652,6 +712,7 @@ void motor_worker_task(void *arg) {
 
             // Send acknowledgment and optionally store state in NVS
             ack = cJSON_CreateObject();
+            cJSON_AddItemToObject(ack, "espClientID", cJSON_CreateString(get_esp_client_id()));
             cJSON_AddStringToObject(ack, "status", "False");
             ack_str = cJSON_Print(ack);
             mqtt_publish(MQTT_TOPIC_PUB_ACK, ack_str);

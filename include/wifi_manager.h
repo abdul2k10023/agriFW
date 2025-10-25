@@ -26,7 +26,7 @@ extern EventGroupHandle_t wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 
 // Function declarations
-void wifi_init_sta(void);
+void wifi_init_sta(const char * SSID_val, const char * WPSK_val);
 
 void set_dns(void);
 

@@ -1,6 +1,5 @@
 #include "wifi_manager.h"
 #include "mqtt_manager.h"
-#include "secrets.h"
 #include "esp_netif.h"
 #include "driver/gpio.h"
 #include <string.h>
@@ -68,7 +67,10 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 }
 
 // Initialize Wi-Fi in Station Mode
-void wifi_init_sta() {
+void wifi_init_sta(const char * SSID_val, const char * WPSK_val ) {
+
+    ESP_LOGI("WiFi", "Wi-Fi SSID=%s, WPSK=%s", SSID_val, WPSK_val);
+
 
     gpio_config(&wifi_led_conf);
     gpio_set_level(WIFI_LED_PIN, 0);
@@ -98,8 +100,8 @@ void wifi_init_sta() {
 
     // Configure Wi-Fi settings
     wifi_config_t wifi_config = {};
-    strcpy((char*)wifi_config.sta.ssid, WIFI_SSID);
-    strcpy((char*)wifi_config.sta.password, WIFI_PASS);
+    strcpy((char*)wifi_config.sta.ssid, SSID_val);
+    strcpy((char*)wifi_config.sta.password, WPSK_val);
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
 
     // Start Wi-Fi in station mode

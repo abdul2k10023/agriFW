@@ -56,6 +56,8 @@ typedef struct {
 #define MQTT_TOPIC_MOTOR_HUMIDITY "esp32/motor/humidity"
 #define MQTT_TOPIC_OTA_CMD "esp32/ota/command"
 #define MQTT_TOPIC_OTA_ACK "esp32/ota/ack"
+#define MQTT_TOPIC_WIFI_CRED "esp32/wifi/cred"
+
 
 
 #define DEFAULT_MOTOR_DURATION 5000
@@ -78,7 +80,7 @@ extern SemaphoreHandle_t shared_sub_data_mutex;
 extern SemaphoreHandle_t ota_shared_mutex;
 
 // All NVS namespaces and their keys
-#define NS_COUNT 2
+#define NS_COUNT 3
 #define MAX_KEYS_PER_NS 3   
 extern const char* namespaces[NS_COUNT];
 extern const char* all_keys[NS_COUNT][MAX_KEYS_PER_NS];

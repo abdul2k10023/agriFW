@@ -23,6 +23,7 @@ void parseScheduleJson(const char *jsonBuffer);
 void parseCommandJson(const char *jsonBuffer);
 void parseOTACommandJson(const char *jsonBuffer);
 void parseHumSetPointJson(const char *jsonBuffer);
+void store_wifi_cred(const char *jsonBuffer);
 void mqtt_led_blink_task(void *arg);
 
 #ifdef __cplusplus

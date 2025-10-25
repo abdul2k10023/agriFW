@@ -13,7 +13,8 @@ typedef enum {
     TYPE_U16,
     TYPE_I16,
     TYPE_U32,
-    TYPE_I32
+    TYPE_I32,
+    TYPE_STR
 } ValueType;
 
 // Methods
